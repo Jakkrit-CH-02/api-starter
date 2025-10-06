@@ -20,10 +20,13 @@ type Querier interface {
 func GetDB() (*gorm.DB, error) {
 	server := env.Env().DBServer
 	port := env.Env().DBPort
-	databse := env.Env().DBName
+	dbName := env.Env().DBName
+	fedauth := env.Env().FedAuth
+	user := env.Env().UserName
+	password := env.Env().Password
 
-	dsn := fmt.Sprintf("server=%s;port=%s;database=%s;trusted_connection=yes", server, port, databse)
-	dial := sqlserver.New(sqlserver.Config{DriverName: "azuresql", DSN: dsn})
+	dsn := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%s;database=%s;fedauth=%s", server, user, password, port, dbName, fedauth)
+	dial := sqlserver.New(sqlserver.Config{DriverName: "sqlserver", DSN: dsn})
 	db, _ := gorm.Open(dial, &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 		DryRun: false,

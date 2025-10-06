@@ -21,6 +21,9 @@ type env struct {
 	DBName   string
 	DBPort   string
 	FedAuth  string
+
+	UserName string
+	Password string
 }
 
 // The single instance of env struct
