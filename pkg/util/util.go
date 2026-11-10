@@ -1,6 +1,7 @@
 package util
 
+// Names of the built-in user roles.
 const (
-	USER_ROLE_ADMIN = "admin"
-	USER_ROLE_USER  = "user"
+	UserRoleAdmin = "admin"
+	UserRoleUser  = "user"
 )

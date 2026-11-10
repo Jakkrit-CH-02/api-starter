@@ -13,4 +13,10 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# Local config
 .env
+
+# air (live reload)
+tmp/
+build-errors.log

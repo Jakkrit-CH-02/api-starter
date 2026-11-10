@@ -1,61 +1,47 @@
+// Package db opens the SQL Server connection used by the service.
 package db
 
 import (
-	"api-starter/domain/entity"
-	"api-starter/pkg/env"
-	"context"
 	"fmt"
 
+	"api-starter/pkg/env"
+
 	"gorm.io/driver/sqlserver"
-	"gorm.io/gen"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-type Querier interface {
-	// SELECT * FROM @@table WHERE name = @name{{if role !=""}} AND role = @role{{end}}
-	FilterWithNameAndRole(name, role string) ([]gen.T, error)
-}
+// Connect opens a gorm connection to SQL Server using the DB_* settings.
+func Connect() (*gorm.DB, error) {
+	cfg := env.Env()
 
-func GetDB() (*gorm.DB, error) {
-	server := env.Env().DBServer
-	port := env.Env().DBPort
-	dbName := env.Env().DBName
-	fedauth := env.Env().FedAuth
-	user := env.Env().UserName
-	password := env.Env().Password
+	dsn := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%s;database=%s",
+		cfg.DBServer, cfg.DBUser, cfg.DBPassword, cfg.DBPort, cfg.DBName)
+	if cfg.DBFedAuth != "" {
+		dsn += ";fedauth=" + cfg.DBFedAuth
+	}
 
-	dsn := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%s;database=%s;fedauth=%s", server, user, password, port, dbName, fedauth)
-	dial := sqlserver.New(sqlserver.Config{DriverName: "sqlserver", DSN: dsn})
-	db, _ := gorm.Open(dial, &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
-		DryRun: false,
-	})
+	// Log every SQL statement in DEV, only slow queries and errors elsewhere.
+	logLevel := logger.Warn
+	if cfg.Build == "DEV" {
+		logLevel = logger.Info
+	}
 
+	db, err := gorm.Open(
+		sqlserver.New(sqlserver.Config{DriverName: "sqlserver", DSN: dsn}),
+		&gorm.Config{Logger: logger.Default.LogMode(logLevel)},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("open sqlserver %s/%s: %w", cfg.DBServer, cfg.DBName, err)
+	}
 	return db, nil
 }
 
-func Migrate() {
-	g := gen.NewGenerator(gen.Config{
-		OutPath: "./query",
-		Mode:    gen.WithoutContext | gen.WithDefaultQuery, // generate mode
-	})
-
-	db, _ := GetDB()
-	g.UseDB(db) // reuse your gorm db
-
-	// db.Migrator().DropTable(&entity.User{})
-
-	db.AutoMigrate(
-		&entity.User{},
-		&entity.UserRole{},
-	)
-
-	g.ApplyInterface(func(Querier) { context.TODO() },
-		entity.User{},
-		entity.UserRole{},
-	)
-
-	// Generate the code
-	g.Execute()
+// Close closes the underlying connection pool.
+func Close(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
 }

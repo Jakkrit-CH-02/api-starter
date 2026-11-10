@@ -1,30 +1,51 @@
+// Package external wires every HTTP route exposed by the service.
 package external
 
 import (
+	"errors"
+
+	"api-starter/internal/user"
 	"api-starter/pkg/env"
 
+	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
-
-	swagger "github.com/arsmn/fiber-swagger/v2"
 )
 
+// PublicRoutes registers the swagger UI, the service info endpoint and the
+// routers of every internal module.
 func PublicRoutes(app *fiber.App, db *gorm.DB) {
-	routerV1 := app.Group("api/v1")
-	routerSWG := app.Group("api-doc")
+	app.Get("/api-doc/*", swagger.HandlerDefault)
 
-	routerSWG.Use("", swagger.HandlerDefault)
-	routerV1.Get("", func(c *fiber.Ctx) error {
-		return c.JSON(map[string]any{
-			"ProductCode": env.Env().PRODUCT_CODE,
-			"moduleName":  env.Env().MODULE_NAME,
-			"Build":       env.Env().BUILD,
-			"Release":     env.Env().RELEASE,
-			"Port":        env.Env().PORT,
-		})
+	v1 := app.Group("/api/v1")
+	v1.Get("/", info)
+
+	// Routers of internal modules. Add new modules here.
+	user.Router(v1, db)
+}
+
+func info(c *fiber.Ctx) error {
+	cfg := env.Env()
+	return c.JSON(fiber.Map{
+		"productCode": cfg.ProductCode,
+		"moduleName":  cfg.ModuleName,
+		"build":       cfg.Build,
+		"release":     cfg.Release,
+		"port":        cfg.Port,
 	})
+}
 
-	// router for internal apis
-	// example: users
-	// UserRouter(routerV1, db)
+// ErrorHandler turns every error returned by a handler into a JSON response:
+// {"message": "..."}.
+func ErrorHandler(c *fiber.Ctx, err error) error {
+	code := fiber.StatusInternalServerError
+	message := "internal server error"
+
+	var fiberErr *fiber.Error
+	if errors.As(err, &fiberErr) {
+		code = fiberErr.Code
+		message = fiberErr.Message
+	}
+
+	return c.Status(code).JSON(fiber.Map{"message": message})
 }
